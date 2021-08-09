@@ -2,7 +2,7 @@ WindSE API
 ==========
 
 .. autosummary::
-    :toctree: _modules
+    :toctree: modules
     :template: module.rst
 
     windse.ParameterManager
@@ -13,6 +13,6 @@ WindSE API
     windse.BoundaryManager
     windse.ProblemManager
     windse.SolverManager
-    windse.ObjectiveFunctions
+    windse.objective_functions
     windse.OptimizationManager
     windse_driver.driver_functions

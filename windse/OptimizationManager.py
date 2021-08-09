@@ -22,7 +22,7 @@ else:
     main_file = "ipython"
     
 ### This checks if we are just doing documentation ###
-if main_file != "sphinx-build":
+if not main_file in ["sphinx-build", "__main__.py"]:
     from dolfin import *
     import numpy as np
     import copy
@@ -45,11 +45,17 @@ if main_file != "sphinx-build":
 else:
     InequalityConstraint = object
     
-    
 import openmdao.api as om
 
 
 class ObjComp(om.ExplicitComponent):
+    """
+    OpenMDAO component to wrap the objective computation from dolfin.
+    
+    Specifically, we use the J and dJ (function and Jacobian) methods
+    to compute the function value and derivative values as needed by the
+    OpenMDAO optimizers.    
+    """
     def initialize(self):
         self.options.declare('initial_DVs', types=np.ndarray)
         self.options.declare('J', types=object)
@@ -75,6 +81,12 @@ class ObjComp(om.ExplicitComponent):
         
         
 class ConsComp(om.ExplicitComponent):
+    """
+    OpenMDAO component to wrap the constraint computation.
+    
+    A small wrapper used on the fenics methods for computing constraint
+    and Jacobian values using the OpenMDAO syntax.
+    """
     def initialize(self):
         self.options.declare('initial_DVs', types=np.ndarray)
         self.options.declare('J', types=object)
@@ -102,6 +114,9 @@ class ConsComp(om.ExplicitComponent):
         
 
 def gather(m):
+    """
+    Helper function to gather constraint Jacobians. Adapated from fenics.
+    """
     if isinstance(m, list):
         return list(map(gather, m))
     elif hasattr(m, "_ad_to_list"):
@@ -110,6 +125,30 @@ def gather(m):
         return m  # Assume it is gathered already
     
 def om_wrapper(J, initial_DVs, dJ, H, bounds, **kwargs):
+    """
+    Custom optimization wrapper to use OpenMDAO optimizers with dolfin-adjoint.
+    
+    Follows the API as defined by dolfin-adjoint.
+    
+    Parameters
+    ----------
+    J : object
+        Function to compute the model analysis value at a design point.
+    initial_DVs : array
+        The initial design variables so we can get the array sizing correct
+        for the OpenMDAO implementation.
+    dJ : object
+        Function to compute the Jacobian at a design point.
+    H : object
+        Function to compute the Hessian at a design point (not used).
+    bounds : array
+        Array of lower and upper bound values for the design variables.
+        
+    Returns
+    -------
+    DVs : array
+        The optimal design variable values.
+    """
     
     # build the model
     prob = om.Problem(model=om.Group())
@@ -532,12 +571,12 @@ class Optimizer(object):
         self.ListControls(m)
 
         if "layout" in self.control_types or "yaw" in self.control_types:
-            self.problem.farm.PlotFarm(filename="wind_farm_step_"+repr(self.iteration),power=-self.Jcurrent)
+            self.problem.farm.PlotFarm(filename="wind_farm_step_"+repr(self.iteration),power=self.Jcurrent)
 
         if "chord" in self.control_types:
             c_lower = np.array(self.bounds[0])[self.indexes[6]] 
             c_upper = np.array(self.bounds[1])[self.indexes[6]] 
-            self.problem.farm.PlotChord(filename="chord_step_"+repr(self.iteration),power=-self.Jcurrent,bounds=[c_lower,c_upper])
+            self.problem.farm.PlotChord(filename="chord_step_"+repr(self.iteration),power=self.Jcurrent,bounds=[c_lower,c_upper])
         
         self.iteration += 1
 
@@ -551,7 +590,14 @@ class Optimizer(object):
     def Optimize(self):
 
         self.fprint("Beginning Optimization",special="header")
-        
+
+        if self.opt_type == "minimize":
+            opt_function = minimize
+        elif self.opt_type == "maximize":
+            opt_function = maximize
+        else:
+            raise ValueError(f"Unknown optimization type: {self.opt_type}")
+
         options = {
             "disp" : True,
             "folder" : self.params.folder,
@@ -561,18 +607,25 @@ class Optimizer(object):
         if hasattr(self, 'obj_ref0'):
             options["obj_ref0"] = self.obj_ref0
         
+        if self.opt_type == "minimize":
+            opt_function = minimize
+        elif self.opt_type == "maximize":
+            opt_function = maximize
+        else:
+            raise ValueError(f"Unknown optimization type: {self.opt_type}")
+
         # TODO : simplify this logic
         if "SNOPT" in self.opt_routine or "OM_SLSQP" in self.opt_routine:
             if "layout" in self.control_types:
-                m_opt=minimize(self.Jhat, method="Custom", options = options, constraints = self.dist_constraint, bounds = self.bounds, callback = self.OptPrintFunction, algorithm=om_wrapper, opt_routine=self.opt_routine)
+                m_opt=opt_function(self.Jhat, method="Custom", options = options, constraints = self.dist_constraint, bounds = self.bounds, callback = self.OptPrintFunction, algorithm=om_wrapper, opt_routine=self.opt_routine)
             else:
-                m_opt=minimize(self.Jhat, method="Custom", options = options, bounds = self.bounds, callback = self.OptPrintFunction, algorithm=om_wrapper, opt_routine=self.opt_routine)
+                m_opt=opt_function(self.Jhat, method="Custom", options = options, bounds = self.bounds, callback = self.OptPrintFunction, algorithm=om_wrapper, opt_routine=self.opt_routine)
         else:
             if "layout" in self.control_types:
-                m_opt=minimize(self.Jhat, method=self.opt_routine, options = options, constraints = self.dist_constraint, bounds = self.bounds, callback = self.OptPrintFunction)
+                m_opt=opt_function(self.Jhat, method=self.opt_routine, options = options, constraints = self.dist_constraint, bounds = self.bounds, callback = self.OptPrintFunction)
             else:
-                m_opt=minimize(self.Jhat, method=self.opt_routine, options = options, bounds = self.bounds, callback = self.OptPrintFunction)
-                
+                m_opt=opt_function(self.Jhat, method=self.opt_routine, options = options, bounds = self.bounds, callback = self.OptPrintFunction)
+
         self.m_opt = m_opt
 
         if self.num_controls == 1:
@@ -603,7 +656,7 @@ class Optimizer(object):
 
         h = []
         for i,c in enumerate(self.controls):
-            h.append(Constant(0.1))
+            h.append(Constant(10))
             # h.append(Constant(0.01*max(abs(float(self.bounds[1][i])),abs(float(self.bounds[1][i])))))
             # h.append(Constant(10.0*abs(float(self.bounds[1][i])-float(self.bounds[0][i]))/2.0))
             # h.append(Constant(0.01*abs(np.mean(self.bounds[1])+np.mean(self.bounds[0]))/2.0))

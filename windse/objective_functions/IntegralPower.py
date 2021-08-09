@@ -1,6 +1,18 @@
-### These must be imported ###
-from dolfin import *
-from dolfin_adjoint import *
+################## HEADER DO NOT EDIT ##################
+import os
+import __main__
+
+### Get the name of program importing this package ###
+if hasattr(__main__,"__file__"):
+    main_file = os.path.basename(__main__.__file__)
+else:
+    main_file = "ipython"
+    
+### This checks if we are just doing documentation ###
+if not main_file in ["sphinx-build", "__main__.py"]:
+    from dolfin import *
+    from dolfin_adjoint import *
+########################################################
 
 ### Additional import statements ###
 import numpy as np
@@ -23,7 +35,7 @@ def objective(solver, inflow_angle = 0.0, first_call=False, annotate=True, **kwa
     # if not annotate:
     #     stop_annotating()
 
-    J = -assemble(dot(solver.problem.tf,solver.problem.u_k)*dx)
+    J = assemble(dot(-solver.problem.tf,solver.problem.u_k)*dx)
 
     # coords = solver.problem.fs.V.tabulate_dof_coordinates()
     # coords = coords[0::3, :]
@@ -60,7 +72,7 @@ def objective(solver, inflow_angle = 0.0, first_call=False, annotate=True, **kwa
                 tf2 = solver.problem.farm.actuator_disks_list[i] * sin(yaw)**2
                 tf3 = solver.problem.farm.actuator_disks_list[i] * 2.0 * cos(yaw) * sin(yaw)
                 tf = tf1*solver.problem.u_k[0]**2+tf2*solver.problem.u_k[1]**2+tf3*solver.problem.u_k[0]*solver.problem.u_k[1]
-                J_list[i+1] = assemble(dot(tf,solver.problem.u_k)*dx,**solver.extra_kwarg)
+                J_list[i+1] = assemble(dot(-tf,solver.problem.u_k)*dx,**solver.extra_kwarg)
             else:
                 print("WARNING: missing individual turbine actuator disk, only able to report full farm power")
 
