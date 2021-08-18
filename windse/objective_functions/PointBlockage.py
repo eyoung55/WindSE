@@ -56,25 +56,36 @@ def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
     # gathered_vel_at_point = np.zeros(solver.params.num_procs, dtype=np.float64)
     # solver.params.comm.Allgather(vel_at_point, gathered_vel_at_point)
 
-    try:
-        vel_at_point = solver.problem.up_k(x0)[0]
-    except:
-        vel_at_point = np.nan
+    x = SpatialCoordinate(solver.problem.dom.mesh)
 
-    gathered_vel_at_point = solver.params.comm.allgather(vel_at_point)
+    delta_x = x[0] - x0[0]
+    delta_y = x[1] - x0[1]
+    delta_z = x[2] - x0[2]
+
+    distance = (delta_x**2 + delta_y**2 + delta_z**2)/solver.problem.dom.mesh.hmax()
+    spherical_gaussian = exp(-pow(distance, 6.0))
+    volume = assemble(spherical_gaussian*dx)
+    J = assemble(solver.problem.up_k[0]*spherical_gaussian/volume*dx)
+
+    # try:
+    #     vel_at_point = solver.problem.up_k(x0)[0]
+    # except:
+    #     vel_at_point = np.nan
+
+    # gathered_vel_at_point = solver.params.comm.allgather(vel_at_point)
 
     # Find the first non-NaN value in a vector
-    def get_first_non_nan(data):
-        for val in data:
-            if not np.isnan(val):
-                return val
+    # def get_first_non_nan(data):
+    #     for val in data:
+    #         if not np.isnan(val):
+    #             return val
 
-        return val
+    #     return val
 
-    J = get_first_non_nan(gathered_vel_at_point)
-    print('Rank %d holds type ' % (solver.params.rank), type(J))
+    # J = get_first_non_nan(gathered_vel_at_point)
+    # print('Rank %d holds type ' % (solver.params.rank), type(J))
 
-    if np.isnan(J):
-        raise ValueError("Couldn't find point", x0, "anywhere inside the domain.")
+    # if np.isnan(J):
+    #     raise ValueError("Couldn't find point", x0, "anywhere inside the domain.")
 
     return J

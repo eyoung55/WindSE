@@ -377,8 +377,8 @@ class SteadySolver(GenericSolver):
             # ### Add some helper functions to solver options ###
             solver_parameters = {"nonlinear_solver": "snes",
                                  "snes_solver": {
-                                 "absolute_tolerance": 1e-12, #1e-6,
-                                 "relative_tolerance": 1e-12, #1e-5,
+                                 "absolute_tolerance": 1e-6, #1e-12
+                                 "relative_tolerance": 1e-5, #1e-12
                                  "linear_solver": "mumps",
                                  "maximum_iterations": 40,
                                  "error_on_nonconvergence": True,
