@@ -48,13 +48,20 @@ def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
     # This doesn't work in parallel (point may not be inside process X's domain)
     # J = solver.problem.up_k(x0)[0]
 
-    try:
-        vel_at_point = np.array([solver.problem.up_k(x0)[0]], dtype=np.float64)
-    except:
-        vel_at_point = np.array([np.nan], dtype=np.float64)
+    # try:
+    #     vel_at_point = np.array([solver.problem.up_k(x0)[0]], dtype=np.float64)
+    # except:
+    #     vel_at_point = np.array([np.nan], dtype=np.float64)
 
-    gathered_vel_at_point = np.zeros(solver.params.num_procs, dtype=np.float64)
-    solver.params.comm.Allgather(vel_at_point, gathered_vel_at_point)
+    # gathered_vel_at_point = np.zeros(solver.params.num_procs, dtype=np.float64)
+    # solver.params.comm.Allgather(vel_at_point, gathered_vel_at_point)
+
+    try:
+        vel_at_point = solver.problem.up_k(x0)[0]
+    except:
+        vel_at_point = np.nan
+
+    gathered_vel_at_point = solver.params.comm.allgather(vel_at_point)
 
     # Find the first non-NaN value in a vector
     def get_first_non_nan(data):
@@ -65,6 +72,7 @@ def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
         return val
 
     J = get_first_non_nan(gathered_vel_at_point)
+    print('Rank %d holds type ' % (solver.params.rank), type(J))
 
     if np.isnan(J):
         raise ValueError("Couldn't find point", x0, "anywhere inside the domain.")
