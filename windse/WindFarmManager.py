@@ -1008,8 +1008,9 @@ class GenericWindFarm(object):
             tf3 += F*T*D*WTGbase/volNormalization * 2.0 * cos(yaw) * sin(yaw)
 
         ### Save the actuator disks for post processing ###
-        self.fprint("Projecting Turbine Force")
-        self.actuator_disks = project(rd,fs.V,solver_type='cg',**self.extra_kwarg)
+        solver_type = 'cg'
+        self.fprint("Projecting Turbine Force: solver_type = %s" % (solver_type))
+        self.actuator_disks = project(rd,fs.V,solver_type=solver_type,**self.extra_kwarg)
         # self.actuator_disks = project(rd,fs.V,solver_type='mumps',**self.extra_kwarg)
 
         tf_stop = time.time()

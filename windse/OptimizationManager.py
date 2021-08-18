@@ -619,9 +619,11 @@ class Optimizer(object):
             "folder" : self.params.folder,
             }
         if hasattr(self, 'obj_ref'):
-            options["obj_ref"] = self.obj_ref
+            # options["obj_ref"] = self.obj_ref
+            options["obj_ref"] = float(self.obj_ref)
         if hasattr(self, 'obj_ref0'):
-            options["obj_ref0"] = self.obj_ref0
+            # options["obj_ref0"] = self.obj_ref0
+            options["obj_ref0"] = float(self.obj_ref0)
         if hasattr(self, 'verify_snopt'):
             options["verify_snopt"] = self.verify_snopt
         
