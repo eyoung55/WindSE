@@ -32,60 +32,39 @@ keyword_defaults = {
 def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
     '''
     This is a simple blockage metric that evaluates the velocity deficit at 
-    a single location in the farm.
+    a single location in the farm.  It does this by creating a small, spherical
+    Gaussian centered at the point x0.  The gaussian has a characteristic width
+    of mesh.hmax() to ensure it captures enough points for a meaningful 
+    measurement of the streamwise velocity.
 
     Keyword arguments:
         location: where the deficit is evaluated
     '''
 
+    # Get the location of the point measurement and symbolic coordinates for the mesh
     x0 = np.array(kwargs.pop("location"))
-    # u_ref, v_ref, w_ref = solver.problem.bd.bc_velocity.split()
-    # u,     v,     w     = solver.problem.u_k.split()
-    # u = solver.problem.p_k
-    # ud = (u(x0)-u_ref(x0))/u_ref(x0)
-    # ud = u(x0)
-    
-    # This doesn't work in parallel (point may not be inside process X's domain)
-    # J = solver.problem.up_k(x0)[0]
-
-    # try:
-    #     vel_at_point = np.array([solver.problem.up_k(x0)[0]], dtype=np.float64)
-    # except:
-    #     vel_at_point = np.array([np.nan], dtype=np.float64)
-
-    # gathered_vel_at_point = np.zeros(solver.params.num_procs, dtype=np.float64)
-    # solver.params.comm.Allgather(vel_at_point, gathered_vel_at_point)
-
     x = SpatialCoordinate(solver.problem.dom.mesh)
 
+    # Calculate dx, dy, dz
     delta_x = x[0] - x0[0]
     delta_y = x[1] - x0[1]
     delta_z = x[2] - x0[2]
 
+    # Calculate the distance to the point, scale by hmax
     distance = (delta_x**2 + delta_y**2 + delta_z**2)/solver.problem.dom.mesh.hmax()
+
+    # Use the distance to generate a sphereical Gaussian function
     spherical_gaussian = exp(-pow(distance, 6.0))
+
+    # Calculate the volume for normalization (this should result in a valid m/s measurement)
     volume = assemble(spherical_gaussian*dx)
-    J = assemble(solver.problem.up_k[0]*spherical_gaussian/volume*dx)
 
-    # try:
-    #     vel_at_point = solver.problem.up_k(x0)[0]
-    # except:
-    #     vel_at_point = np.nan
+    # Use the sphereical Gaussian to measure the streamwise velocity
+    if volume <= 1e-10:
+        J = np.nan
+        print("Warning: No area of integration for point blockage, refine mesh or increase Gaussian width.")
+    else:
 
-    # gathered_vel_at_point = solver.params.comm.allgather(vel_at_point)
-
-    # Find the first non-NaN value in a vector
-    # def get_first_non_nan(data):
-    #     for val in data:
-    #         if not np.isnan(val):
-    #             return val
-
-    #     return val
-
-    # J = get_first_non_nan(gathered_vel_at_point)
-    # print('Rank %d holds type ' % (solver.params.rank), type(J))
-
-    # if np.isnan(J):
-    #     raise ValueError("Couldn't find point", x0, "anywhere inside the domain.")
-
+        ### Evaluate objective ###
+        J = assemble(solver.problem.up_k[0]*spherical_gaussian/volume*dx)
     return J

@@ -1,7 +1,6 @@
 general: 
     output: ["mesh","initial_guess","height","turbine_force","solution"]
-    dolfin_adjoint: False
-    debug_mode: True
+    dolfin_adjoint: True
 
 wind_farm: 
     type: grid        
@@ -68,4 +67,16 @@ optimization:
             type: upstream
         cyld_kernel_#02: 
             type: above
+        power: {}
     save_objective: True
+    constraint_types:
+        min_dist:       
+            target: 2   
+            scale:  1.0e-5   
+        power:
+            target: 8000000
+            scale: 1.0e-6
+    control_types: [layout]
+    layout_bounds: [[-600, 600],[-300, 300]] 
+    optimize: True
+    opt_routine: SNOPT
