@@ -95,6 +95,10 @@ class GenericProblem(object):
     def ComputeTurbineForce(self,u,inflow_angle,simTime=0.0):
 
         ### Compute the relative yaw angle ###
+        # if inflow_angle is not None:
+        #     inflow_angle = inflow_angle-self.dom.inflow_angle
+        # else:
+        #     inflow_angle = self.dom.inflow_angle
         if inflow_angle is None:
             inflow_angle = self.dom.inflow_angle
 
@@ -496,6 +500,10 @@ class GenericProblem(object):
         self.farm.cd = self.cd
         self.farm.chord = self.chord
         self.farm.num_blade_segments = self.num_blade_segments
+
+    def SimpleControlUpdate(self):
+        self.u_k, self.p_k = split(self.up_k)
+        self.farm.SimpleControlUpdate()
 
 
     def ChangeWindAngle(self,inflow_angle):

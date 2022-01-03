@@ -36,6 +36,7 @@ def objective(solver, inflow_angle = 0.0, first_call=False, annotate=True, **kwa
     #     stop_annotating()
 
     J = assemble(dot(-solver.problem.tf,solver.problem.u_k)*dx)
+    # J = assemble(dot(-solver.problem.tf,Constant((1.0,1.0,1.0)))*dx)
 
     # coords = solver.problem.fs.V.tabulate_dof_coordinates()
     # coords = coords[0::3, :]
@@ -75,7 +76,8 @@ def objective(solver, inflow_angle = 0.0, first_call=False, annotate=True, **kwa
                 tf = tf1*solver.problem.u_k[0]**2+tf2*solver.problem.u_k[1]**2+tf3*solver.problem.u_k[0]*solver.problem.u_k[1]
                 J_list[i+2] = assemble(dot(-tf,solver.problem.u_k)*dx,**solver.extra_kwarg)
             else:
-                print("WARNING: missing individual turbine actuator disk, only able to report full farm power")
+                pass
+                # print("WARNING: missing individual turbine actuator disk, only able to report full farm power")
 
         J_list[-1]=float(J)
 
