@@ -115,7 +115,28 @@ class GenericBoundary(object):
                     bc_loc_id = self.boundary_names[bc_loc] - 1
 
                     # Get the correct compiled subdomain based off the location id
-                    bc_domain = self.dom.boundary_subdomains[bc_loc_id]
+                    # self.dom.boundary_subdomains = [east,north,west,south,bottom,top]
+
+                    if np.abs(self.dom.inflow_angle - 0.0) < 1e-6:
+                        print('Found inflow angle %f (0 deg)' % (self.dom.inflow_angle))
+                        reodered_subdomains = self.dom.boundary_subdomains.copy()
+
+                    elif np.abs(self.dom.inflow_angle - 1.5707963268) < 1e-6:
+                        print('Found inflow angle %f (90 deg)' % (self.dom.inflow_angle))
+                        temp = self.dom.boundary_subdomains.copy()
+                        reodered_subdomains = [temp[1], temp[2], temp[3], temp[0], temp[4], temp[5]]
+
+                    elif np.abs(self.dom.inflow_angle - 3.1415926536) < 1e-6:
+                        print('Found inflow angle %f (180 deg)' % (self.dom.inflow_angle))
+                        temp = self.dom.boundary_subdomains.copy()
+                        reodered_subdomains = [temp[2], temp[3], temp[0], temp[1], temp[4], temp[5]]
+
+                    elif np.abs(self.dom.inflow_angle - 4.7123889804) < 1e-6:
+                        print('Found inflow angle %f (270 deg)' % (self.dom.inflow_angle))
+                        temp = self.dom.boundary_subdomains.copy()
+                        reodered_subdomains = [temp[3], temp[0], temp[1], temp[2], temp[4], temp[5]]
+
+                    bc_domain = reodered_subdomains[bc_loc_id]
 
                     # Append the right type of Dirichlet BC to the list
                     if bc_type == 'inflow':
@@ -134,9 +155,15 @@ class GenericBoundary(object):
                     elif bc_type == 'free_slip':
                         # Identify the component/direction normal to this wall
                         if bc_loc == 'east' or bc_loc == 'west':
-                            norm_comp = 0
+                            if np.abs(self.dom.inflow_angle - 1.5707963268) < 1e-6 or np.abs(self.dom.inflow_angle - 4.7123889804) < 1e-6:
+                                norm_comp = 1
+                            else:
+                                norm_comp = 0
                         elif bc_loc == 'south' or bc_loc == 'north':
-                            norm_comp = 1
+                            if np.abs(self.dom.inflow_angle - 1.5707963268) < 1e-6 or np.abs(self.dom.inflow_angle - 4.7123889804) < 1e-6:
+                                norm_comp = 0
+                            else:
+                                norm_comp = 1
                         elif bc_loc == 'bottom' or bc_loc == 'top':
                             norm_comp = 2
 

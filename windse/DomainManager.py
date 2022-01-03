@@ -389,6 +389,11 @@ class GenericDomain(object):
         elif self.params.num_procs > 1:
             # This isn't needed for actual boundary marking, but it helps it pass a test later on
             self.BuildBoundaryMarkers()
+            
+            ### Rotate Boundary
+            if not near(self.inflow_angle,0.0):
+                self.RecomputeBoundaryMarkers(self.inflow_angle)
+            # self.boundary_markers = adapt(self.boundary_markers,self.mesh)
 
 
         self.fprint("Original Mesh Vertices: {:d}".format(old_verts))

@@ -284,7 +284,7 @@ class SteadySolver(GenericSolver):
         super(SteadySolver, self).__init__(problem)
         self.u_k,self.p_k = split(self.problem.up_k)
 
-    def Solve(self):
+    def Solve(self, weight_factor=None):
         """
         This solves the problem setup by the problem object.
         """
@@ -437,7 +437,14 @@ class SteadySolver(GenericSolver):
 
         ### Evaluate the objectives ###
         if self.optimizing or self.save_objective:
-            self.J += self.EvaluateObjective()
+
+            if weight_factor is not None:
+                print('Found objective weight factor = ', weight_factor)
+                self.J += weight_factor * self.EvaluateObjective()
+
+            else:
+                self.J += self.EvaluateObjective()
+
             # self.J += self.objective_func(self,(self.iter_theta-self.problem.dom.inflow_angle)) 
             self.J = ControlUpdater(self.J, self.problem)
 
@@ -1955,6 +1962,10 @@ class MultiAngleSolver(SteadySolver):
         self.angles = np.linspace(*self.wind_range,endpoint=self.endpoint)
         # self.angles += self.angle_offset
 
+        self.angle_weights = np.array([5.0, 2.0, 1.0, 2.0])
+
+        assert len(self.angle_weights) == len(self.angles)
+
     def Solve(self):
         for i, theta in enumerate(self.angles):
             self.fprint("Performing Solve {:d} of {:d}".format(i+1,len(self.angles)),special="header")
@@ -1963,7 +1974,7 @@ class MultiAngleSolver(SteadySolver):
                 self.problem.dom.inflow_angle = theta
                 self.ChangeWindAngle(theta)
             self.iter_val = theta
-            self.orignal_solve()
+            self.orignal_solve(weight_factor=self.angle_weights[i])
             self.fprint("Finished Solve {:d} of {:d}".format(i+1,len(self.angles)),special="footer")
 
 class TimeSeriesSolver(SteadySolver):
