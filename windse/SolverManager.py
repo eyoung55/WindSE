@@ -230,7 +230,7 @@ class GenericSolver(object):
         return out
 
 
-    def EvaluateObjective(self,output_name="objective_data",opt_iter=-1):
+    def EvaluateObjective(self,output_name="objective_data",opt_iter=-1, weight_factor=None):
         self.fprint("Evaluating Objective Data",special="header")
         start = time.time()
 
@@ -246,7 +246,7 @@ class GenericSolver(object):
             objective_split = objective.split("_#")[0]
             objective_func = obj_funcs.objective_functions[objective_split]
             args = (self, (self.problem.dom.inflow_angle))
-            kwargs = {"first_call": first_call, "annotate": annotate}
+            kwargs = {"first_call": first_call, "annotate": annotate, "weight_factor": weight_factor}
             kwargs.update(obj_kwargs)
             out = obj_funcs._annotated_objective(objective_func, *args, **kwargs)
             obj_list.append(out)
@@ -440,7 +440,7 @@ class SteadySolver(GenericSolver):
 
             if weight_factor is not None:
                 print('Found objective weight factor = ', weight_factor)
-                self.J += weight_factor * self.EvaluateObjective()
+                self.J += self.EvaluateObjective(weight_factor=weight_factor)
 
             else:
                 self.J += self.EvaluateObjective()
@@ -1962,7 +1962,8 @@ class MultiAngleSolver(SteadySolver):
         self.angles = np.linspace(*self.wind_range,endpoint=self.endpoint)
         # self.angles += self.angle_offset
 
-        self.angle_weights = np.array([5.0, 2.0, 1.0, 2.0])
+        # self.angle_weights = np.array([5.0, 2.0, 1.0, 2.0])
+        self.angle_weights = np.array([5.0, 0.0, 0.0, 0.0])
 
         assert len(self.angle_weights) == len(self.angles)
 

@@ -35,7 +35,13 @@ def objective(solver, inflow_angle = 0.0, first_call=False, annotate=True, **kwa
     # if not annotate:
     #     stop_annotating()
 
-    J = assemble(dot(-solver.problem.tf,solver.problem.u_k)*dx)
+    print(kwargs)
+
+    if 'weight_factor' in kwargs and kwargs['weight_factor'] is not None:
+        J = assemble(Constant(kwargs['weight_factor'])*dot(-solver.problem.tf,solver.problem.u_k)*dx)
+
+    else:
+        J = assemble(dot(-solver.problem.tf,solver.problem.u_k)*dx)
     # J = assemble(dot(-solver.problem.tf,Constant((1.0,1.0,1.0)))*dx)
 
     # coords = solver.problem.fs.V.tabulate_dof_coordinates()
