@@ -431,9 +431,23 @@ class ActuatorLine(GenericTurbine):
             theta_tt = self.theta/self.angular_velocity
             theta_prev_tt = self.theta_prev/self.angular_velocity
 
-            pos, unit_vec, vel = self.rotate_points([pos, unit_vec, vel], wave_motion(theta_tt), [0, 1, 0])
+            wave_data_filename = 'ptfm_motion_10ms_nss.csv'
+            wave_data_path = os.path.join(os.path.dirname(self.read_turb_data), wave_data_filename)
+            wave_data = np.genfromtxt(wave_data_path, skip_header=1)
 
-            pos_prev = self.rotate_points(pos_prev, wave_motion(theta_prev_tt), [0, 1, 0])
+            # 0: Time (s)
+            # 1: PtfmSurge (m)
+            # 2: PtfmSway (m)
+            # 3: PtfmHeave (m)
+            # 4: PtfmRoll (deg)
+            # 5: PtfmPitch (deg)
+            # 6: PtfmYaw (deg)
+
+            wave_interp = interp.interp1d(wave_data[:, 0], wave_data[:, 5], kind='linear')
+
+            pos, unit_vec, vel = self.rotate_points([pos, unit_vec, vel], np.radians(wave_interp(theta_tt)), [0, 1, 0])
+
+            pos_prev = self.rotate_points(pos_prev, np.radians(wave_interp(theta_prev_tt)), [0, 1, 0])
 
             # if self.turbine_motion_freq is not None:
             #     motion_theta = self.turbine_motion_amp*np.sin(self.turbine_motion_freq*self.simTime_ahead*np.pi*2.0)
