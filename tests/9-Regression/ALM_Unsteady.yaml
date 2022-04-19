@@ -10,7 +10,7 @@ wind_farm:
 
 turbines:
     type: line                   # Actuator Line Method (ALM)
-    read_turb_data: Input_Data/baseline.csv
+    read_turb_data: ../../demo/documented/Yaml_Examples/Input_Data/iea_15/blade_data.csv
     rpm: 4.0                     # Rotor revolutions per minute (RPM) | rev/min
     chord_factor: 1.0
     gauss_factor: 2.0
