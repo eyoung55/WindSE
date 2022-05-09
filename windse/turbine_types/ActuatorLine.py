@@ -77,6 +77,7 @@ class ActuatorLine(GenericTurbine):
         self.gauss_factor = self.params["turbines"]["gauss_factor"]
         self.tip_loss = self.params["turbines"]["tip_loss"]
         self.hub_rad = self.params["turbines"]["hub_rad"]
+        self.floating = self.params["turbines"]["floating"]
 
 
     def compute_parameters(self):
@@ -431,6 +432,7 @@ class ActuatorLine(GenericTurbine):
             theta_tt = self.theta/self.angular_velocity
             theta_prev_tt = self.theta_prev/self.angular_velocity
 
+            #wave_data_filename = 'ptfm_motion_10ms_sss.csv'
             wave_data_filename = 'ptfm_motion_10ms_nss.csv'
             wave_data_path = os.path.join(os.path.dirname(self.read_turb_data), wave_data_filename)
             wave_data = np.genfromtxt(wave_data_path, skip_header=1)
@@ -443,11 +445,27 @@ class ActuatorLine(GenericTurbine):
             # 5: PtfmPitch (deg)
             # 6: PtfmYaw (deg)
 
+            if not self.floating:
+                # If the platform is NOT floating, make the data the average backward pitch (effectively a constant)
+                wave_data[:, 5] = np.mean(wave_data[:, 5])
+
             wave_interp = interp.interp1d(wave_data[:, 0], wave_data[:, 5], kind='linear')
 
+            pos_before_floating = self.rotate_points(pos, np.radians(wave_interp(theta_prev_tt)), [0, 1, 0])
             pos, unit_vec, vel = self.rotate_points([pos, unit_vec, vel], np.radians(wave_interp(theta_tt)), [0, 1, 0])
-
             pos_prev = self.rotate_points(pos_prev, np.radians(wave_interp(theta_prev_tt)), [0, 1, 0])
+
+            # Finite different calc of the velocity incurred by this shift in the floating position
+            # Negative because we seek the velocity of fluid relative to a stationary blade
+            if self.simTime_prev is None:
+                vel_due_to_floating = 0.0
+            else:
+                vel_due_to_floating = -(pos - pos_before_floating)/(0.5*(self.simTime + self.dt - self.simTime_prev))
+
+            test_experimental_finite_diff = True
+
+            if test_experimental_finite_diff:
+                vel += vel_due_to_floating
 
             # if self.turbine_motion_freq is not None:
             #     motion_theta = self.turbine_motion_amp*np.sin(self.turbine_motion_freq*self.simTime_ahead*np.pi*2.0)

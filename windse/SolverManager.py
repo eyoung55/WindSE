@@ -810,7 +810,7 @@ class UnsteadySolver(GenericSolver):
             average_start_time = two_flowthrough_time
             self.fprint('Start averaging after two flow-throughs, or %.1f seconds' % (two_flowthrough_time))
         else:
-            average_start_time = 5.0
+            average_start_time = 500.0
 
         # ================================================================
 
