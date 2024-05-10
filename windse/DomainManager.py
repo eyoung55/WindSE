@@ -756,16 +756,16 @@ class GenericDomain(object):
         self.fprint("Path: {0}".format(self.terrain_path),offset=1)
 
         ### import ground data
-        self.terrain = np.loadtxt(self.terrain_path)
-        x_data = self.terrain[1:,0]*self.xscale
-        y_data = self.terrain[1:,1]*self.xscale
-        z_data = self.terrain[1:,2]*self.xscale
+        self.terrain = np.genfromtxt(self.terrain_path, delimiter=",", skip_header=1)
+        x_data = self.terrain[:, 0]*self.xscale
+        y_data = self.terrain[:, 1]*self.xscale
+        z_data = self.terrain[:, 2]*self.xscale
 
         ### generate interpolating function
         x_data = np.sort(np.unique(x_data))
         y_data = np.sort(np.unique(y_data))
-        z_data = np.reshape(z_data,(int(self.terrain[0,0]),int(self.terrain[0,1])))
-        self.terrain_interpolated = RectBivariateSpline(x_data,y_data,z_data.T)
+        z_data = np.reshape(z_data, (len(x_data), len(y_data)))
+        self.terrain_interpolated = RectBivariateSpline(x_data,y_data,z_data)
 
 
         def InterplatedGroundFunction(x,y,dx=0,dy=0):
@@ -1027,13 +1027,13 @@ class BoxDomain(GenericDomain):
                 dir_for_meshes = tempfile.TemporaryDirectory()
 
                 # write and finalize gmsh
-                gmsh.write(os.path.join(dir_for_meshes, "dummy.msh"))
+                gmsh.write(os.path.join(dir_for_meshes.name, "dummy.msh"))
                 gmsh.finalize() # don't need it anymore!
 
                 # use meshio to convert from gmsh to dolfin xml file
-                mesh_meshio = meshio.read(os.path.join(dir_for_meshes, "dummy.msh"))
+                mesh_meshio = meshio.read(os.path.join(dir_for_meshes.name, "dummy.msh"))
                 meshio.write(
-                    os.path.join(dir_for_meshes, "dummy.xml"),
+                    os.path.join(dir_for_meshes.name, "dummy.xml"),
                     mesh_meshio,
                     file_format="dolfin-xml",
                 )
@@ -2047,6 +2047,270 @@ class InterpolatedBoxDomain(BoxDomain):
     def Finalize(self):
         self.Move(self.ground_function)
         DefaultFinalize(self)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class InterpolatedBoxDomain(GenericDomain):
+    def __init__(self):
+        super().__init__()
+
+        mesh_start = time.time()
+        self.dim = 3
+        z_scaling = 1.0
+
+        if self.params.rank == 0:
+
+            import gmsh
+            import meshio
+            import tempfile
+
+            gmsh.initialize()
+
+            gmsh.model.add("interp_box")
+
+            self.x_range = self.x_range*self.xscale
+            self.y_range = self.y_range*self.xscale
+            self.z_range = self.z_range*self.xscale
+
+            self.SetupInterpolatedGround()
+
+            x_ground_pts = np.linspace(self.x_range[0], self.x_range[1], self.nx+1)
+            y_ground_pts = np.linspace(self.y_range[0], self.y_range[1], self.ny+1)
+
+            # Helper function to return a node tag given two indices i and j:
+            def tag(i, j):
+                linear_index = (self.nx + 1) * j + i + 1
+                # print(f"i = {i}, j = {j}, linid = {linear_index}")
+                return linear_index
+
+            # The x, y, z coordinates of all the nodes:
+            coords = []
+
+            # The tags of the corresponding nodes:
+            nodes = []
+
+            # The connectivities of the triangle elements (3 node tags per triangle) on the
+            # terrain surface:
+            tris = []
+
+            # The connectivities of the line elements on the 4 boundaries (2 node tags
+            # for each line element):
+            lin = [[], [], [], []]
+
+            # The connectivities of the point elements on the 4 corners (1 node tag for each
+            # point element):
+            pnt = [tag(0, 0),
+                   tag(self.nx, 0),
+                   tag(self.nx, self.ny),
+                   tag(0, self.ny)
+                   ]
+
+
+            for i, xx in enumerate(x_ground_pts):
+                for j, yy in enumerate(y_ground_pts):
+                    nodes.append(tag(i, j))
+
+                    coords.extend([
+                        xx,
+                        yy,
+                        z_scaling*self.ground_function(xx, yy)
+                    ])
+                    if i > 0 and j > 0:
+                        tris.extend([tag(i - 1, j - 1), tag(i, j - 1), tag(i - 1, j)])
+                        tris.extend([tag(i, j - 1), tag(i, j), tag(i - 1, j)])
+
+                    if (i == 0 or i == self.nx) and j > 0:
+                        lin[3 if i == 0 else 1].extend([tag(i, j - 1), tag(i, j)])
+
+                    if (j == 0 or j == self.ny) and i > 0:
+                        lin[0 if j == 0 else 2].extend([tag(i - 1, j), tag(i, j)])
+
+            # print(tris)
+
+
+            # print(len(coords))
+            # print(coords)
+            # Create 4 discrete points for the 4 corners of the terrain surface:
+            for i in range(4):
+                gmsh.model.addDiscreteEntity(0, i + 1)
+
+            gmsh.model.setCoordinates(1, x_ground_pts[0], y_ground_pts[0], coords[3 * tag(0, 0) - 1])
+            gmsh.model.setCoordinates(2, x_ground_pts[-1], y_ground_pts[0], coords[3 * tag(self.nx, 0) - 1])
+            gmsh.model.setCoordinates(3, x_ground_pts[-1], y_ground_pts[-1], coords[3 * tag(self.nx, self.ny) - 1])
+            gmsh.model.setCoordinates(4, x_ground_pts[0], y_ground_pts[-1], coords[3 * tag(0, self.ny) - 1])
+
+            # Create 4 discrete bounding curves, with their boundary points:
+            for i in range(4):
+                gmsh.model.addDiscreteEntity(1, i + 1, [i + 1, i + 2 if i < 3 else 1])
+
+            # Create one discrete surface, with its bounding curves:
+            gmsh.model.addDiscreteEntity(2, 1, [1, 2, -3, -4])
+
+            # Add all the nodes on the surface (for simplicity... see below):
+            gmsh.model.mesh.addNodes(2, 1, nodes, coords)
+
+            # Add point elements on the 4 points, line elements on the 4 curves, and
+            # triangle elements on the surface:
+            for i in range(4):
+                # Type 15 for point elements:
+                gmsh.model.mesh.addElementsByType(i + 1, 15, [], [pnt[i]])
+                # Type 1 for 2-node line elements:
+                gmsh.model.mesh.addElementsByType(i + 1, 1, [], lin[i])
+            # Type 2 for 3-node triangle elements:
+            gmsh.model.mesh.addElementsByType(1, 2, [], tris)
+
+            # Reclassify the nodes on the curves and the points (since we put them all on
+            # the surface before with `addNodes' for simplicity)
+            gmsh.model.mesh.reclassifyNodes()
+
+            # Create a geometry for the discrete curves and surfaces, so that we can remesh
+            # them later on:
+            gmsh.model.mesh.createGeometry()
+
+            # Note that for more complicated meshes, e.g. for on input unstructured STL
+            # mesh, we could use `classifySurfaces()' to automatically create the discrete
+            # entities and the topology; but we would then have to extract the boundaries
+            # afterwards.
+
+            # Create other build-in CAD entities to form one volume below the terrain
+            # surface. Beware that only built-in CAD entities can be hybrid, i.e. have
+            # discrete entities on their boundary: OpenCASCADE does not support this
+            # feature.
+            p1 = gmsh.model.geo.addPoint(x_ground_pts[0], y_ground_pts[0], z_scaling*self.z_range[1])
+            p2 = gmsh.model.geo.addPoint(x_ground_pts[-1], y_ground_pts[0], z_scaling*self.z_range[1])
+            p3 = gmsh.model.geo.addPoint(x_ground_pts[-1], y_ground_pts[-1], z_scaling*self.z_range[1])
+            p4 = gmsh.model.geo.addPoint(x_ground_pts[0], y_ground_pts[-1], z_scaling*self.z_range[1])
+
+            c1 = gmsh.model.geo.addLine(p1, p2)
+            c2 = gmsh.model.geo.addLine(p2, p3)
+            c3 = gmsh.model.geo.addLine(p3, p4)
+            c4 = gmsh.model.geo.addLine(p4, p1)
+            c10 = gmsh.model.geo.addLine(p1, 1)
+            c11 = gmsh.model.geo.addLine(p2, 2)
+            c12 = gmsh.model.geo.addLine(p3, 3)
+            c13 = gmsh.model.geo.addLine(p4, 4)
+            ll1 = gmsh.model.geo.addCurveLoop([c1, c2, c3, c4])
+            s1 = gmsh.model.geo.addPlaneSurface([ll1])
+            ll3 = gmsh.model.geo.addCurveLoop([c1, c11, -1, -c10])
+            s3 = gmsh.model.geo.addPlaneSurface([ll3])
+            ll4 = gmsh.model.geo.addCurveLoop([c2, c12, -2, -c11])
+            s4 = gmsh.model.geo.addPlaneSurface([ll4])
+            ll5 = gmsh.model.geo.addCurveLoop([c3, c13, 3, -c12])
+            s5 = gmsh.model.geo.addPlaneSurface([ll5])
+            ll6 = gmsh.model.geo.addCurveLoop([c4, c10, 4, -c13])
+            s6 = gmsh.model.geo.addPlaneSurface([ll6])
+            sl1 = gmsh.model.geo.addSurfaceLoop([s1, s3, s4, s5, s6, 1])
+            v1 = gmsh.model.geo.addVolume([sl1])
+
+            gmsh.model.geo.synchronize()
+
+            # gmsh.option.setNumber('Mesh.MeshSizeMin', 200.0)
+            # gmsh.option.setNumber('Mesh.MeshSizeMax', 200.0)
+
+            # gmsh.model.mesh.generate(3)
+
+            gmsh.model.mesh.setSize(gmsh.model.getEntities(0), 150.0)
+
+            # generate and output
+            gmsh.model.mesh.generate(3)
+
+            # create a temporary directory to hold mesh IO files for conversion
+            dir_for_meshes = tempfile.TemporaryDirectory()
+
+            # write and finalize gmsh
+            gmsh.write(os.path.join(dir_for_meshes.name, "dummy.msh"))
+            gmsh.finalize() # don't need it anymore!
+
+            # use meshio to convert from gmsh to dolfin xml file
+            mesh_meshio = meshio.read(os.path.join(dir_for_meshes.name, "dummy.msh"))
+            meshio.write(
+                os.path.join(dir_for_meshes.name, "dummy.xml"),
+                mesh_meshio,
+                file_format="dolfin-xml",
+            )
+        else:
+            dir_for_meshes = None
+
+        # broadcast the temporary directory for shared use
+        dirname_for_meshes = self.params.comm.bcast(dir_for_meshes, root=0)
+
+        # load the xml into windse
+        print(self.params.rank, dirname_for_meshes)
+        self.mesh = Mesh(os.path.join(dirname_for_meshes.name, "dummy.xml"))
+
+        self.mesh.coordinates()[:, 2] /= z_scaling
+
+        self.params.comm.Barrier()
+
+        # delete the temporary directory
+        if self.params.rank == 0:
+            dir_for_meshes.cleanup()
+
+
+        # box = Box(start,stop)
+        # self.mesh = generate_mesh(box,self.nx)
+        self.bmesh = BoundaryMesh(self.mesh,"exterior")
+        mesh_stop = time.time()
+        self.fprint("Mesh Generated: {:1.2f} s".format(mesh_stop-mesh_start))
+
+        ### Define Boundary Subdomains ###
+        mark_start = time.time()
+        self.fprint("")
+        self.fprint("Marking Boundaries")
+
+        east    = CompiledSubDomain("near(x[0], x1, tol) && on_boundary",x1 = self.x_range[1], tol = 1e-10)
+        north   = CompiledSubDomain("near(x[1], y1, tol) && on_boundary",y1 = self.y_range[1], tol = 1e-10)
+        west    = CompiledSubDomain("near(x[0], x0, tol) && on_boundary",x0 = self.x_range[0], tol = 1e-10)
+        south   = CompiledSubDomain("near(x[1], y0, tol) && on_boundary",y0 = self.y_range[0], tol = 1e-10)
+        bottom  = CompiledSubDomain("on_boundary")
+        top     = CompiledSubDomain("near(x[2], z1, tol) && on_boundary",z1 = self.z_range[1], tol = 1e-10)
+
+        self.boundary_subdomains = [bottom,east,north,west,south,top]
+        self.boundary_names = {"bottom":1,"east":2,"north":3,"west":4,"south":5,"top":6,"inflow":None,"outflow":None}
+        self.boundary_types = {"inflow":    ["west","south","north"],
+                               "no_slip":   ["bottom"],
+                               "free_slip": ["top"],
+                               "no_stress": ["east"]}
+
+        self.SetupPeriodicMapping()
+
+        ### Generate the boundary markers for boundary conditions ###
+        # if self.params.num_procs == 1:
+        self.BuildBoundaryMarkers()
+
+        ### Rotate Boundary
+        if not near(self.inflow_angle,0.0):
+            self.RecomputeBoundaryMarkers(self.inflow_angle)
+
+        mark_stop = time.time()
+        self.fprint("Boundaries Marked: {:1.2f} s".format(mark_stop-mark_start))
+
+
+        self.fprint("Initial Domain Setup",special="footer")
+
+
+
+
+
 
 
 class PeriodicDomain(BoxDomain):

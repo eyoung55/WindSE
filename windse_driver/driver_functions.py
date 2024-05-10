@@ -95,6 +95,7 @@ def BuildDomain(params):
     ### Build Domain ###
     if params["domain"]["interpolated"]:
         dom_dict = {"box":windse.InterpolatedBoxDomain,
+                    "box":windse.InterpolatedBoxDomain,
                     "cylinder":windse.InterpolatedCylinderDomain,
                     "imported":windse.ImportedDomain
         }

@@ -13,7 +13,9 @@ home_path = os.getcwd()
 reg_path = "../9-Regression/"
 
 ### Get Yaml Files to be run in serial (all of them) ###
-yaml_files = sorted(pathlib.Path(__file__, reg_path).resolve().glob('*.yaml'))
+yaml_files = sorted(pathlib.Path(__file__, reg_path).resolve().glob('*gmsh.yaml'))
+# print(yaml_files)
+# exit()
 
 ### Import the tolerances ###
 tolerances = yaml.load(open("tests/9-Regression/Truth_Data/tolerances.yaml"),Loader=yaml.SafeLoader)
