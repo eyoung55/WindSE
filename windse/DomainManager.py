@@ -773,7 +773,8 @@ class GenericDomain(object):
         x_data = np.sort(np.unique(x_data))
         y_data = np.sort(np.unique(y_data))
         z_data = np.reshape(z_data,(int(self.terrain[0,0]),int(self.terrain[0,1])))
-        self.terrain_interpolated = RectBivariateSpline(x_data,y_data,z_data.T)
+        #self.terrain_interpolated = RectBivariateSpline(x_data,y_data,z_data.T)
+        self.terrain_interpolated = RectBivariateSpline(x_data,y_data,z_data)
 
 
         def InterplatedGroundFunction(x,y,dx=0,dy=0):

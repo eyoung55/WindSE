@@ -144,7 +144,9 @@ class GenericProblem(object):
         if self.farm.turbine_type == "disabled" or self.farm.numturbs == 0:
 
             # if there are no turbine return an zero force term
-            tf_term = Function(self.fs.V)*dx
+            #tf_term = Function(self.fs.V)*dx
+            v, q = TestFunctions(self.fs.W)
+            tf_term = inner(Function(self.fs.V), v)*dx
         else:
 
             # compute tf and dx for each turbine
