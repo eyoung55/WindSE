@@ -42,7 +42,7 @@ def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
     distance from ground if terrain is present).
     '''
 
-    velocity_array = np.zeros((solver.problem.farm.numturbs, 6))
+    velocity_array = np.zeros((solver.problem.farm.numturbs, 9))
 
     print('Calculating Velocity at Each Turbine')
 
@@ -55,23 +55,28 @@ def objective(solver, inflow_angle = 0.0, first_call=False, **kwargs):
         # Use the (x, y, z) position to get the velocity
         velocity_at_point = solver.problem.u_k(mx, my, mz)
 
+        u_x = velocity_at_point[0]
+        u_y = velocity_at_point[1]
+        u_z = velocity_at_point[2]
+        u_mag = np.sqrt(u_x * u_x + u_y * u_y + u_z * u_z)
+
         # Get the yaw for writing the file
         yaw = solver.problem.farm.turbines[k].myaw
 
         # Store the turbine id, x, y, z, yaw, and velocity 
         # on the kth row for turbine #k
-        velocity_array[k, :] = [k, mx, my, mz, yaw, velocity_at_point]
+        velocity_array[k, :] = [k, mx, my, mz, yaw, u_x, u_y, u_z, u_mag]
 
     folder_string = solver.params.folder+"data/"
     np.savetxt('%sturbine_velocities.csv' % (folder_string),
         velocity_array,
         fmt='%.6e',
-        header='Turbine ID (#), X-Location (m), Y-Location (m), Z-Location (m), Yaw (Rad), Velocity (m/s)',
+        header='Turbine ID (#), X-Location (m), Y-Location (m), Z-Location (m), Yaw (Rad), X-Velocity (m/s), Y-Velocity (m/s), Z-Velocity (m/s), Velocity Magnitude (m/s)',
         delimiter=',')
 
-    # This will be the average of the 5th column, that is,
-    # the average of all the point-wise velocities calculated above
-    J = np.mean(velocity_array[:, 5])
+    # This will be the average of the 8th column, that is,
+    # the average of all the point-wise velocity magnitudes calculated above
+    J = np.mean(velocity_array[:, 8])
 
     print('Objective Value: ', float(J))
 
